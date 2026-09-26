@@ -1,0 +1,28 @@
+CONTO CHIARO – come metterla online (una volta sola, lo fa solo chi la pubblica)
+
+Opzione A – Netlify (la più semplice)
+1. Vai su https://app.netlify.com/drop e accedi (account gratuito: serve solo a te).
+2. Trascina nella pagina l'intera cartella "conto-chiaro" (quella che contiene index.html).
+3. Dopo pochi secondi ricevi un indirizzo tipo https://nome-a-caso.netlify.app.
+   In "Site configuration → Change site name" puoi sceglierne uno più bello (es. conto-chiaro-mallia).
+4. Manda quel link alle persone che vuoi.
+
+Opzione B – GitHub Pages
+1. Crea un repository pubblico su GitHub e carica il contenuto di questa cartella.
+2. Settings → Pages → Deploy from a branch → main / root → Save.
+3. Il link sarà https://TUONOME.github.io/NOME-REPOSITORY/
+
+Per aggiornare l'app in futuro: ripubblica la cartella nello stesso sito (su Netlify: Deploys → trascina la cartella).
+Chi ha già l'app installata vedrà "Nuova versione disponibile → Aggiorna". I suoi dati non vengono toccati.
+
+COME LA INSTALLA CHI LA USA (nessun account)
+- iPhone: apri il link con Safari → tasto Condividi → "Aggiungi alla schermata Home".
+- Android: apri il link con Chrome → menu ⋮ → "Installa app" (o "Aggiungi a schermata Home").
+- Computer: Chrome/Edge mostrano l'icona "Installa" nella barra dell'indirizzo; va bene anche usarla dal browser.
+
+PRIVACY
+I dati restano solo sul dispositivo di chi la usa (memoria del browser). Nessun server li riceve:
+nemmeno chi ha pubblicato l'app può vederli. Per questo è importante fare ogni tanto
+"Impostazioni → Crea backup" e salvare il file su iCloud / Google Drive / email.
+Su iPhone conviene usarla dalla schermata Home: Safari può cancellare i dati dei siti
+non usati per settimane, mentre le app installate sulla Home non subiscono questa pulizia.
