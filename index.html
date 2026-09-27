@@ -217,6 +217,12 @@ tr.fut td{color:var(--ink-3)}
 .status.done{background:var(--accent-soft);color:var(--accent)}
 .rec{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .rec:last-child{border-bottom:0}
+.calc td:first-child{white-space:normal}.calc td:last-child{vertical-align:top;padding-left:12px}
+.occrow{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 0}.occrow:last-child{border-bottom:0}
+.slips{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.slip{border:1px dashed var(--line);background:none;border-radius:10px;padding:7px 4px;display:grid;gap:2px;justify-items:center;font-size:12px;color:var(--ink-3)}
+.slip b{font-size:13px;font-weight:600;color:var(--ink-3)}
+.slip.on{border:1px solid var(--accent-soft);background:var(--accent-soft);color:var(--accent)}.slip.on b{color:var(--ink)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -377,13 +383,13 @@ $("#fab").onclick=()=>openEditor(null);
 function render(){
   const onboarding=S.loaded.config&&!S.cfgExists;
   $(".tabbar").hidden=onboarding;$("#fab").hidden=onboarding;
-  document.querySelectorAll(".tabbar button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===S.ui.tab?"page":"false"));
+  document.querySelectorAll(".tabbar button").forEach(b=>b.setAttribute("aria-current",b.dataset.tab===(S.ui.tab==="730"?"piano":S.ui.tab)?"page":"false"));
   $("#monthnav").hidden=onboarding||!(S.ui.tab==="mese"||S.ui.tab==="movimenti");$("#monthLabel").textContent=ymLabel(S.ui.ym);
   $("#brandName").textContent=S.config?.name||"Conto Chiaro";
   const app=$("#app");
     if(!S.loaded.mesi||!S.loaded.config){app.innerHTML=`<section class="view"><div class="card empty">Carico il bilancio…</div></section>`;return}
   if(onboarding){viewOnboarding(app);return}
-  const v={mese:viewMese,movimenti:viewMovimenti,grafici:viewGrafici,piano:viewPiano,impostazioni:viewImpostazioni}[S.ui.tab]||viewMese;
+  const v={mese:viewMese,movimenti:viewMovimenti,grafici:viewGrafici,piano:viewPiano,"730":view730,impostazioni:viewImpostazioni}[S.ui.tab]||viewMese;
   const y=window.scrollY;v(app);window.scrollTo(0,y);
 }
 
@@ -654,6 +660,7 @@ function viewPiano(app){const cfg=S.config,A=agg();const goals=cfg.goals||[],rec
   app.innerHTML=`<section class="view">
     <div class="hero"><div><div class="label">Patrimonio netto</div><div class="big amt">${eur(r2(A.okNow+accTot-debtLeft))}</div></div>
       <div class="sub"><div><b class="amt">${eur(A.okNow)}</b><span>Conto</span></div>${accCats.map(x=>`<div><b class="amt">${eur(x.v)}</b><span>${esc(x.c.name)}</span></div>`).join("")}${debts.length?`<div><b class="amt">−${eur(debtLeft)}</b><span>Debiti residui</span></div>`:""}</div></div>
+    ${tax730Card()}
     <div class="stack"><div class="row between"><h2>Obiettivi di risparmio</h2><button class="linkbtn" id="addGoal">Nuovo obiettivo</button></div>
       ${goals.length?goals.map(g=>{const s=goalStats(g);return `<div class="card goal"><div class="row between" style="flex-wrap:wrap"><h3>${esc(g.name)}</h3>${statusChip(s)}</div>
         <div class="row between"><span class="amt"><b style="font-size:20px">${eur(s.saved)}</b> <span class="faint">di ${eur(g.target)}</span></span><span class="faint">${Math.round(s.pct)}%</span></div>
@@ -669,7 +676,7 @@ function viewPiano(app){const cfg=S.config,A=agg();const goals=cfg.goals||[],rec
         <div class="meter"><i class="${done?"good":""}" style="width:${pct}%"></i></div><dl class="kv"><dt>Pagato</dt><dd>${eur(s.paid)} di ${eur(d.total)}</dd>${done?"":`<dt>Rate già previste</dt><dd>${eur(s.planned)}</dd><dt>Ultima rata prevista</dt><dd>${ld(s.last)}</dd>`}</dl>
         <div><button class="linkbtn" data-dedit="${esc(d.id)}">Modifica</button></div></div>`}).join(""):`<div class="card empty">Nessun finanziamento. Se paghi rate (auto, telefono, corsi), aggiungile qui per vedere quanto manca.</div>`}</div>
   </section>`;
-  $("#addGoal").onclick=()=>openGoalEditor(null);$("#addRec").onclick=()=>openRecEditor(null);$("#addDebt").onclick=()=>openDebtEditor(null);
+  $("#open730").onclick=()=>{S.ui.tab="730";render();window.scrollTo(0,0)};$("#addGoal").onclick=()=>openGoalEditor(null);$("#addRec").onclick=()=>openRecEditor(null);$("#addDebt").onclick=()=>openDebtEditor(null);
   app.querySelectorAll("[data-gadd]").forEach(b=>b.onclick=()=>{const acc=CATS().find(c=>c.type==="accantonamento");if(!acc){toast("Crea prima una categoria di risparmio in Impostazioni");return}openEditor(null,{kind:"accantonamento",cat:acc.name,goal:b.dataset.gadd,desc:"Per "+(goals.find(g=>g.id===b.dataset.gadd)||{}).name})});
   app.querySelectorAll("[data-gedit]").forEach(b=>b.onclick=()=>openGoalEditor(goals.find(g=>g.id===b.dataset.gedit)));
   app.querySelectorAll("[data-redit]").forEach(b=>b.onclick=()=>openRecEditor(recs.find(r=>r.id===b.dataset.redit)));
@@ -799,6 +806,245 @@ async function downloadFile(name,data){const blob=typeof data==="string"?new Blo
 if("serviceWorker" in navigator&&location.protocol!=="file:"){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").then(reg=>{
   reg.addEventListener("updatefound",()=>{const w=reg.installing;if(!w)return;w.addEventListener("statechange",()=>{if(w.state==="installed"&&navigator.serviceWorker.controller)showUpdate()})})}).catch(()=>{})})}
 function showUpdate(){const t=$("#toast");t.innerHTML=`Nuova versione disponibile <button class="linkbtn" style="color:inherit;text-decoration:underline;margin-left:8px" id="upd">Aggiorna</button>`;t.hidden=false;clearTimeout(toastT);$("#upd").onclick=()=>location.reload()}
+
+/* ---------- SIMULA 730 ---------- */
+/* Regole anno d'imposta 2026: IRPEF 23/33/43% (L. 199/2025), detrazioni art. 13 TUIR commi 1 e 5 (non cumulabili),
+   cuneo fiscale L. 207/2024 (somma esente e ulteriore detrazione, solo lavoro dipendente), trattamento integrativo,
+   detrazioni 19%, prestazioni occasionali (redditi diversi, ritenuta d'acconto 20%).
+   Addizionali regionali 2026: Dipartimento delle Finanze, consultazione del gennaio 2026. */
+const REGIONI={
+  abruzzo:{l:"Abruzzo",sc:[[28000,1.67],[50000,2.87],[Infinity,3.33]]},
+  basilicata:{l:"Basilicata",sc:[[Infinity,1.23]]},
+  bolzano:{l:"Bolzano (Provincia autonoma)",sc:[[50000,1.23],[Infinity,1.73]],detr:[[0,90000,430.5]],note:"Detrazione di 430,50 € fino a 90.000 € di reddito; non considera le detrazioni per figli."},
+  calabria:{l:"Calabria",sc:[[Infinity,1.73]]},
+  campania:{l:"Campania",sc:[[15000,1.73],[28000,2.96],[50000,3.20],[Infinity,3.33]],note:"Non considera le detrazioni per figli a carico."},
+  emilia:{l:"Emilia-Romagna",sc:[[15000,1.33],[28000,1.93],[50000,2.78],[Infinity,3.33]]},
+  friuli:{l:"Friuli Venezia Giulia",sc:[[Infinity,1.23]],flat:[[15000,0.70]],note:"Fino a 15.000 € di reddito si applica lo 0,70% su tutto il reddito."},
+  lazio:{l:"Lazio",sc:[[15000,1.73],[Infinity,3.33]],flat:[[28000,1.73]],detr:[[28000.01,30000,60]],note:"Fino a 28.000 € si applica l'1,73% su tutto il reddito; tra 28.001 e 30.000 € detrazione di 60 €."},
+  liguria:{l:"Liguria",sc:[[28000,1.23],[50000,3.18],[Infinity,3.23]]},
+  lombardia:{l:"Lombardia",sc:[[15000,1.23],[28000,1.58],[50000,1.72],[Infinity,1.73]]},
+  marche:{l:"Marche",sc:[[15000,1.23],[28000,1.53],[50000,1.70],[Infinity,1.73]],note:"Non considera l'aliquota ridotta per chi ha figli disabili."},
+  molise:{l:"Molise",sc:[[15000,2.03],[28000,2.23],[Infinity,3.63]]},
+  piemonte:{l:"Piemonte",sc:[[15000,1.62],[28000,2.68],[50000,3.31],[Infinity,3.33]],note:"Non considera le detrazioni per figli a carico."},
+  puglia:{l:"Puglia",sc:[[15000,1.33],[28000,2.13],[50000,3.23],[Infinity,3.33]],note:"Non considera le detrazioni per figli a carico."},
+  sardegna:{l:"Sardegna",sc:[[Infinity,1.23]],note:"Non considera le detrazioni per figli minorenni."},
+  sicilia:{l:"Sicilia",sc:[[Infinity,1.23]]},
+  toscana:{l:"Toscana",sc:[[15000,1.42],[28000,1.43],[50000,3.32],[Infinity,3.33]]},
+  trento:{l:"Trento (Provincia autonoma)",sc:[[50000,1.23],[Infinity,1.73]],exempt:30000,note:"Esente fino a 30.000 € di reddito; non considera le detrazioni per figli."},
+  umbria:{l:"Umbria",sc:[[15000,1.73],[28000,3.02],[50000,3.12],[Infinity,3.33]],detr:[[28000.01,50000,150]],note:"Tra 28.001 e 50.000 € detrazione di 150 €."},
+  valledaosta:{l:"Valle d'Aosta",sc:[[Infinity,1.23]],exempt:15000,note:"Esente fino a 15.000 € di reddito."},
+  veneto:{l:"Veneto",sc:[[Infinity,1.23]],note:"Non considera l'aliquota ridotta dello 0,9% per persone con disabilità."}
+};
+const MESI_730=["","Gen","Feb","Mar","Apr","Mag","Giu","Lug","Ago","Set","Ott","Nov","Dic","13ª","14ª"];
+const TIPI={dipendente:"Lavoro dipendente",cococo:"Collaborazione (co.co.co.)",occasionale:"Prestazione occasionale"};
+function taxYear(y){const c=S.config;c.tax=c.tax||{years:{}};c.tax.years=c.tax.years||{};
+  if(!c.tax.years[y])c.tax.years[y]={employers:[],slips:[],occ:[],spese:{medCat:(CATS().find(x=>/salute|medic/i.test(x.name))||{}).name||"",medRimb:0,medExtra:0,istr:0,trasp:0,sport:0,sportN:1},add:{reg:"lombardia",regRate:1.5,comRate:0.8,comSoglia:0},proj:true};
+  const T=c.tax.years[y];T.occ=T.occ||[];T.employers.forEach(e=>{e.type=e.type||"dipendente"});return T}
+function irpefLorda(R){let t=0,prev=0;for(const [lim,al] of [[28000,.23],[50000,.33],[Infinity,.43]]){if(R>prev)t+=(Math.min(R,lim)-prev)*al;prev=lim}return t}
+function detrLavoro(R,days){if(R<=0)return 0;let d;
+  if(R<=15000)d=1955;else if(R<=28000)d=1910+1190*(28000-R)/13000;else if(R<=50000)d=1910*(50000-R)/22000;else d=0;
+  d=d*days/365;if(R<=15000)d=Math.max(d,690);if(R>25000&&R<=35000)d+=65;return Math.max(0,d)}
+function detrAutonomo(R){if(R<=0)return 0;if(R<=5500)return 1265;if(R<=28000)return 500+765*(28000-R)/22500;if(R<=50000)return 500*(50000-R)/22000;return 0}
+function ulterioreCuneo(R){if(R>20000&&R<=32000)return 1000;if(R>32000&&R<40000)return 1000*(40000-R)/8000;return 0}
+function sommaEsente(Rdip,R){if(Rdip<=0||R>20000)return 0;return Rdip*(Rdip<=8500?.071:Rdip<=15000?.053:.048)}
+function addReg(R,a){if(R<=0)return 0;const g=a.reg==="flat"?null:REGIONI[a.reg];
+  if(!g)return R*(+a.regRate||0)/100;
+  if(g.exempt&&R<=g.exempt)return 0;
+  let t=null;if(g.flat)for(const [max,rate] of g.flat)if(R<=max){t=R*rate/100;break}
+  if(t===null){t=0;let prev=0;for(const [lim,al] of g.sc){if(R>prev)t+=(Math.min(R,lim)-prev)*al/100;prev=lim}}
+  if(g.detr)for(const [min,max,amt] of g.detr)if(R>=min&&R<=max)t-=amt;
+  return Math.max(0,t)}
+function addCom(R,a){if(R<=0)return 0;if(+a.comSoglia&&R<=+a.comSoglia)return 0;return R*(+a.comRate||0)/100}
+function empTotals(T,e){
+  const slips=T.slips.filter(s=>s.emp===e.id);const from=+e.from||1,to=+e.to||12;
+  const ord=slips.filter(s=>s.m>=1&&s.m<=12);const n=ord.length;
+  const avg=k=>n?ord.reduce((s,x)=>s+(+x[k]||0),0)/n:0;
+  const expected=[];for(let m=from;m<=to;m++)expected.push(m);(e.extra||[]).forEach(m=>expected.push(m));
+  let imp=0,irpef=0,bonus=0,entered=0,missing=0;
+  for(const m of expected){const s=slips.find(x=>x.m===m);
+    if(s){imp+=+s.imp||0;irpef+=+s.irpef||0;bonus+=+s.bonus||0;entered++}
+    else if(T.proj&&n){missing++;imp+=avg("imp");irpef+=avg("irpef");if(m<=12)bonus+=avg("bonus")}}
+  for(const s of slips)if(!expected.includes(s.m)){imp+=+s.imp||0;irpef+=+s.irpef||0;bonus+=+s.bonus||0;entered++}
+  return{imp,irpef,bonus,entered,missing,expected:expected.length}}
+function occTotals(T){const lordo=T.occ.reduce((s,o)=>s+(+o.lordo||0),0),contr=T.occ.reduce((s,o)=>s+(+o.contr||0),0),rit=T.occ.reduce((s,o)=>s+(+o.rit||0),0);
+  return{lordo,contr,rit,reddito:Math.max(0,lordo-contr),n:T.occ.length}}
+function speseDetraibili(y,T){const sp=T.spese;
+  const medCat=sp.medCat?all().filter(it=>it.cat===sp.medCat&&it.d.startsWith(String(y))).reduce((s,it)=>s+it.amt,0):0;
+  const med=Math.max(0,medCat-(+sp.medRimb||0)+(+sp.medExtra||0));
+  return{medCat:r2(medCat),med:r2(med),istr:+sp.istr||0,trasp:+sp.trasp||0,sport:+sp.sport||0,sportN:Math.max(1,+sp.sportN||1)}}
+function calc730(y){const T=taxYear(y);const emps=T.employers.map(e=>({e,t:empTotals(T,e)}));const occ=occTotals(T);
+  const Rdip=emps.filter(x=>x.e.type==="dipendente").reduce((s,x)=>s+x.t.imp,0);
+  const Rass=emps.filter(x=>x.e.type!=="dipendente").reduce((s,x)=>s+x.t.imp,0);
+  const R=Rdip+Rass+occ.reddito;
+  const trattenute=emps.reduce((s,x)=>s+x.t.irpef,0)+occ.rit;const ricevuti=emps.reduce((s,x)=>s+x.t.bonus,0);
+  const monthsSet=new Set();T.employers.forEach(e=>{for(let m=+e.from||1;m<=(+e.to||12);m++)monthsSet.add(m)});
+  const days=Math.min(365,Math.round(monthsSet.size/12*365))||365;
+  const lorda=irpefLorda(R);
+  const c1=(Rdip+Rass)>0?detrLavoro(R,days):0,c5=occ.reddito>0?detrAutonomo(R):0;
+  const dLav=Math.max(c1,c5),dTipo=c1>=c5?"lavoro dipendente e assimilati":"prestazioni occasionali";
+  const dCuneo=Rdip>0?ulterioreCuneo(R):0;
+  const sp=speseDetraibili(y,T);
+  const d19med=Math.max(0,sp.med-129.11)*.19;let d19alt=(sp.istr+Math.min(250,sp.trasp)+Math.min(sp.sport,210*sp.sportN))*.19;
+  if(R>120000)d19alt*=Math.max(0,(240000-R)/120000);let d19=d19med+d19alt;if(R>200000)d19=Math.max(0,d19-440);
+  const netta=Math.max(0,lorda-dLav-dCuneo-d19);
+  const sEs=sommaEsente(Rdip,R);
+  let ti=0;if(Rdip+Rass>0&&c1>=c5){if(R<=15000){if(lorda>c1-75*days/365)ti=1200*days/365}else if(R<=28000){ti=Math.min(1200,Math.max(0,c1-lorda))}}
+  const spettanti=sEs+ti;
+  const sost=emps.map(x=>x.t.imp);
+  const regTot=addReg(R,T.add),regSep=sost.reduce((s,v)=>s+addReg(v,T.add),0);
+  const comTot=addCom(R,T.add),comSep=sost.reduce((s,v)=>s+addCom(v,T.add),0);
+  const z=v=>Math.abs(v)<0.005?0:r2(v);
+  const saldoIrpef=z(netta-trattenute),saldoBonus=z(ricevuti-spettanti),saldoReg=z(regTot-regSep),saldoCom=z(comTot-comSep);
+  const totale=z(saldoIrpef+saldoBonus+saldoReg+saldoCom);
+  const entered=emps.reduce((s,x)=>s+x.t.entered,0)+occ.n,expected=emps.reduce((s,x)=>s+x.t.expected,0)+occ.n;
+  return{T,emps,occ,Rdip,Rass,R,days,lorda,c1,c5,dLav,dTipo,dCuneo,sp,d19med,d19alt,d19,netta,trattenute,sEs,ti,spettanti,ricevuti,regTot,regSep,comTot,comSep,saldoIrpef,saldoBonus,saldoReg,saldoCom,totale,entered,expected}}
+function tax730Card(){const y=+todayISO().slice(0,4);const T=S.config.tax&&S.config.tax.years&&S.config.tax.years[y];
+  let body=`<p class="muted" style="margin:0;font-size:14px">Inserisci buste paga, collaborazioni e prestazioni occasionali e scopri in anticipo se il 730 del prossimo anno sarà a rimborso o a debito.</p>`;
+  if(T&&(T.slips.length||(T.occ||[]).length)){const c=calc730(y);const deb=c.totale>0.5;
+    body=`<div class="row between"><span class="muted">Stima ${y}</span><b class="amt ${deb?"neg":"pos"}" style="font-size:20px">${Math.abs(c.totale)<0.5?"in pari":(deb?"da pagare ":"a rimborso ")+eur(Math.abs(c.totale))}</b></div><p class="faint" style="margin:0;font-size:12.5px">${c.entered} documenti inseriti su ${c.expected} previsti</p>`}
+  return `<div class="stack"><div class="row between"><h2>Simula 730</h2><button class="linkbtn" id="open730">Apri</button></div><div class="card stack">${body}</div></div>`}
+const eur0=v=>new Intl.NumberFormat("it-IT",{maximumFractionDigits:0}).format(v||0);
+function view730(app){
+  const y=S.ui.taxY=S.ui.taxY||+todayISO().slice(0,4);const c=calc730(y);const T=c.T;
+  const has=T.slips.length||T.occ.length;const deb=c.totale>0.5,rim=c.totale<-0.5;
+  const monthsTo=Math.max(1,monthsBetween(ymOf(todayISO()),(y+1)+"-07"));
+  const row=(l,v,cls="",sub="")=>`<tr><td>${l}${sub?`<div class="faint" style="font-size:12px">${sub}</div>`:""}</td><td class="${cls}">${v}</td></tr>`;
+  const sal=(l,v,verb)=>`<tr class="tot"><td>${l}</td><td class="${v>0?"neg":v<0?"pos":""}">${v>0?verb+" ":v<0?"a credito ":""}${eur(Math.abs(v))}</td></tr>`;
+  const catOpts=`<option value="">Nessuna</option>`+CATS().filter(x=>x.type==="uscita").map(x=>`<option ${x.name===T.spese.medCat?"selected":""}>${esc(x.name)}</option>`).join("");
+  const reg=REGIONI[T.add.reg];
+  const empCard=e=>{const t=empTotals(T,e);const slips=T.slips.filter(s=>s.emp===e.id);
+    const cells=[];for(let m=+e.from||1;m<=(+e.to||12);m++)cells.push(m);(e.extra||[]).forEach(m=>cells.push(m));
+    return `<div class="card stack"><div class="row between"><div><h3>${esc(e.name)}</h3><span class="chip">${TIPI[e.type]}</span></div><button class="linkbtn" data-empedit="${esc(e.id)}">Modifica</button></div>
+      <div class="slips">${cells.map(m=>{const s=slips.find(x=>x.m===m);return `<button class="slip ${s?"on":""}" data-slip="${esc(e.id)}|${m}"><span>${MESI_730[m]}</span><b class="amt">${s?eur0(s.imp):"+"}</b></button>`}).join("")}</div>
+      <dl class="kv"><dt>Imponibile ${t.missing?"(con proiezione)":""}</dt><dd>${eur(t.imp)}</dd><dt>IRPEF trattenuta</dt><dd>${eur(t.irpef)}</dd>${t.bonus?`<dt>Bonus ricevuti in busta</dt><dd>${eur(t.bonus)}</dd>`:""}</dl></div>`};
+  const occCard=`<div class="card stack"><div class="row between" style="flex-wrap:wrap;gap:6px 12px"><div><h3>Prestazioni occasionali</h3><span class="chip">ritenuta d'acconto 20%</span></div><button class="linkbtn" id="addOcc">Aggiungi compenso</button></div>
+    ${T.occ.length?`<div>${T.occ.slice().sort((a,b)=>a.d<b.d?-1:1).map(o=>`<button class="occrow" data-occ="${esc(o.id)}"><span class="grow"><b style="font-weight:500">${esc(o.who||"Compenso")}</b><span class="faint" style="display:block;font-size:12.5px">${o.d?o.d.split("-").reverse().join("/"):""} · ritenuta ${eur(o.rit)}${+o.contr?" · INPS "+eur(o.contr):""}</span></span><span class="amt">${eur(o.lordo)}</span></button>`).join("")}</div>
+      <dl class="kv"><dt>Compensi lordi</dt><dd>${eur(c.occ.lordo)}</dd><dt>Ritenute d'acconto</dt><dd>${eur(c.occ.rit)}</dd>${c.occ.contr?`<dt>Contributi INPS a tuo carico</dt><dd>${eur(c.occ.contr)}</dd>`:""}</dl>
+      ${c.occ.lordo>5000?`<p class="banner" style="margin:0;font-size:13.5px">Hai superato 5.000 € di compensi occasionali nell'anno: sulla parte oltre i 5.000 € scattano i contributi alla Gestione separata INPS (1/3 a tuo carico, trattenuto dal committente). Inseriscili nel campo "Contributi INPS" del compenso.</p>`:`<p class="faint" style="margin:0;font-size:12.5px">Fino a 5.000 € di compensi occasionali nell'anno non si pagano contributi INPS: resta solo la ritenuta d'acconto del 20%, che nel 730 viene scalata dalle tasse dovute.</p>`}`:
+    `<p class="faint" style="margin:0;font-size:13.5px">Lavoretti senza partita IVA pagati con ritenuta d'acconto del 20%. Aggiungi ogni compenso ricevuto.</p>`}</div>`;
+  app.innerHTML=`<section class="view">
+    <div class="row between"><button class="linkbtn" id="back730">← Piano</button>
+      <div class="seg" role="group" aria-label="Anno">${[y-1,y,y+1].map(k=>`<button data-ty="${k}" aria-pressed="${k===y}">${k}</button>`).join("")}</div></div>
+    <div class="hero"><div><div class="label">730 del ${y+1} · redditi ${y}</div>
+      <div class="big amt">${!has?"—":rim?"+"+eur(-c.totale):deb?"−"+eur(c.totale):eur(0)}</div>
+      <div style="margin-top:6px;font-size:15px">${!has?"Aggiungi i tuoi redditi per vedere la stima.":rim?"Stima a rimborso: ti verrebbe restituito dopo il 730.":deb?"Stima a debito: verrebbe trattenuto in busta paga (o pagato con F24) dopo il 730.":"Stima in pari."}</div></div>
+      ${has?`<div class="sub"><div><b class="amt">${eur(c.R)}</b><span>Reddito ${c.entered<c.expected&&T.proj?"previsto":"inserito"}</span></div><div><b>${c.entered}/${c.expected}</b><span>Documenti inseriti</span></div>
+      ${deb?`<div><b class="amt">${eur(c.totale/monthsTo)}</b><span>Da mettere da parte al mese fino a luglio ${y+1}</span></div>`:""}</div>`:""}</div>
+    <p class="faint" style="margin:0;font-size:12.5px">È una stima indicativa basata sulle regole IRPEF 2026 e sui dati che inserisci: non sostituisce il 730 fatto dal CAF o dal commercialista.</p>
+
+    <div class="stack"><div class="row between" style="flex-wrap:wrap;gap:4px 12px"><h2>Redditi</h2><button class="linkbtn" id="addEmp">Aggiungi datore o collaborazione</button></div>
+      ${T.employers.map(empCard).join("")}
+      ${occCard}
+      ${T.employers.length?`<label class="switch"><span><b style="font-weight:500">Proietta fino a fine anno</b><br><span class="faint" style="font-size:12.5px">Per le buste mancanti usa la media di quelle inserite</span></span><input type="checkbox" id="t_proj" ${T.proj?"checked":""}></label>`:""}
+    </div>
+
+    <div class="stack"><h2>Spese detraibili al 19%</h2><div class="card stack">
+      <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label class="field"><span>Spese mediche: categoria</span><select id="t_medCat">${catOpts}</select></label>
+        <label class="field"><span>Già rimborsate (€)</span><input type="text" inputmode="decimal" id="t_medRimb" value="${numIn(T.spese.medRimb||0)}"></label>
+        <label class="field"><span>Altre spese mediche (€)</span><input type="text" inputmode="decimal" id="t_medExtra" value="${numIn(T.spese.medExtra||0)}"></label>
+        <label class="field"><span>Università e istruzione (€)</span><input type="text" inputmode="decimal" id="t_istr" value="${numIn(T.spese.istr||0)}"></label>
+        <label class="field"><span>Abbonamento mezzi pubblici (€)</span><input type="text" inputmode="decimal" id="t_trasp" value="${numIn(T.spese.trasp||0)}"></label>
+        <label class="field"><span>Sport figli 5-18 anni (€)</span><input type="text" inputmode="decimal" id="t_sport" value="${numIn(T.spese.sport||0)}"></label>
+        <label class="field"><span>Numero figli per lo sport</span><input type="number" min="1" max="10" id="t_sportN" value="${T.spese.sportN||1}"></label>
+      </div>
+      <p class="faint" style="margin:0;font-size:12.5px">Spese mediche della categoria nel ${y}: ${eur(c.sp.medCat)} → considerate ${eur(c.sp.med)}, franchigia 129,11 €. Mezzi pubblici: massimo 250 €. Sport: massimo 210 € per figlio. Per le università non statali e telematiche vale un tetto fissato ogni anno dal Ministero: se lo superi, scrivi il tetto.</p>
+    </div></div>
+
+    <div class="stack"><h2>Addizionali</h2><div class="card stack">
+      <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label class="field" style="grid-column:1/-1"><span>Regione di residenza (al 1° gennaio ${y})</span><select id="t_reg">${Object.entries(REGIONI).map(([k,g])=>`<option value="${k}" ${T.add.reg===k?"selected":""}>${esc(g.l)}</option>`).join("")}<option value="flat" ${T.add.reg==="flat"?"selected":""}>Altro: aliquota unica</option></select></label>
+        <label class="field" ${T.add.reg==="flat"?"":"hidden"}><span>Aliquota regionale (%)</span><input type="text" inputmode="decimal" id="t_regRate" value="${numIn(T.add.regRate)}"></label>
+        <label class="field"><span>Aliquota comunale (%)</span><input type="text" inputmode="decimal" id="t_comRate" value="${numIn(T.add.comRate)}"></label>
+        <label class="field"><span>Esenzione comunale fino a (€)</span><input type="text" inputmode="decimal" id="t_comSoglia" value="${numIn(T.add.comSoglia||0)}"></label>
+      </div>
+      ${reg?`<p class="faint" style="margin:0;font-size:12.5px">${esc(reg.l)} 2026: ${reg.sc.length===1&&!isFinite(reg.sc[0][0])?`aliquota unica ${numIn(reg.sc[0][1])}%`:reg.sc.map(([lim,al],i)=>`${isFinite(lim)?"fino a "+eur0(lim)+" €":"oltre"} ${numIn(al)}%`).join(" · ")}.${reg.note?" "+esc(reg.note):""}</p>`:""}
+      <p class="faint" style="margin:0;font-size:12.5px">Aliquote regionali 2026 dal Dipartimento delle Finanze. Quelle del tuo comune le trovi su finanze.gov.it, sezione addizionale comunale all'IRPEF.</p>
+    </div></div>
+
+    ${has?`<div class="stack"><h2>Come arrivo al risultato</h2><div class="card flush"><div class="tblwrap"><table class="calc"><tbody>
+      ${c.Rdip?row("Lavoro dipendente",eur(c.Rdip)):""}${c.Rass?row("Collaborazioni (co.co.co.)",eur(c.Rass)):""}${c.occ.reddito?row("Prestazioni occasionali",eur(c.occ.reddito),"",c.occ.contr?"compensi meno contributi INPS":""):""}
+      ${row("Reddito complessivo",eur(c.R))}
+      ${row("IRPEF lorda",eur(c.lorda),"","23% fino a 28.000 €, 33% fino a 50.000 €, 43% oltre")}
+      ${row("− Detrazione per "+c.dTipo,eur(c.dLav),"",(c.c1&&c.c5?"le due detrazioni non si sommano: si usa la più alta":"")+(c.days<365&&c.c1>=c.c5?" per "+c.days+" giorni":""))}
+      ${c.dCuneo?row("− Ulteriore detrazione cuneo fiscale",eur(c.dCuneo)):""}
+      ${c.d19?row("− Detrazioni 19%",eur(c.d19),"","mediche "+eur(c.d19med)+" · altre "+eur(c.d19alt)):""}
+      ${row("= IRPEF dovuta",eur(c.netta))}
+      ${row("− IRPEF già trattenuta",eur(c.trattenute),"",c.occ.rit?"di cui ritenute d'acconto "+eur(c.occ.rit):"")}
+      ${sal("Saldo IRPEF",c.saldoIrpef,"da pagare")}
+      ${(c.ricevuti||c.spettanti)?row("Bonus ricevuti in busta",eur(c.ricevuti),"","somma esente cuneo e trattamento integrativo")+row("Bonus che spettano sul reddito totale",eur(c.spettanti),"",[c.sEs?"somma esente "+eur(c.sEs):"",c.ti?"trattamento integrativo "+eur(c.ti):""].filter(Boolean).join(" · "))+sal("Saldo bonus",c.saldoBonus,"da restituire"):""}
+      ${row("Addizionale regionale",eur(c.saldoReg),c.saldoReg>0?"neg":"","dovuta "+eur(c.regTot)+" · già calcolata da datori e committenti "+eur(c.regSep))}
+      ${row("Addizionale comunale",eur(c.saldoCom),c.saldoCom>0?"neg":"","dovuta "+eur(c.comTot)+" · già calcolata da datori e committenti "+eur(c.comSep))}
+      <tr class="tot"><td>Risultato 730</td><td class="${deb?"neg":rim?"pos":""}">${deb?"da pagare ":rim?"a rimborso ":""}${eur(Math.abs(c.totale))}</td></tr>
+    </tbody></table></div></div></div>`:""}
+  </section>`;
+  $("#back730").onclick=()=>{S.ui.tab="piano";render();window.scrollTo(0,0)};
+  app.querySelectorAll("[data-ty]").forEach(b=>b.onclick=()=>{S.ui.taxY=+b.dataset.ty;render()});
+  $("#addEmp").onclick=()=>openEmpEditor(y,null);$("#addOcc").onclick=()=>openOccEditor(y,null);
+  app.querySelectorAll("[data-empedit]").forEach(b=>b.onclick=()=>openEmpEditor(y,T.employers.find(e=>e.id===b.dataset.empedit)));
+  app.querySelectorAll("[data-slip]").forEach(b=>b.onclick=()=>{const [id,m]=b.dataset.slip.split("|");openSlipEditor(y,id,+m)});
+  app.querySelectorAll("[data-occ]").forEach(b=>b.onclick=()=>openOccEditor(y,T.occ.find(o=>o.id===b.dataset.occ)));
+  const pj=$("#t_proj");if(pj)pj.onchange=e=>{T.proj=e.target.checked;writeConfig();render()};
+  $("#t_medCat").onchange=e=>{T.spese.medCat=e.target.value;writeConfig();render()};
+  const num=(id,obj,key)=>{$(id).onchange=e=>{const v=parseAmt(e.target.value||"0");if(!isFinite(v)){toast("Scrivi un numero valido");return}obj[key]=r2(v);writeConfig();render()}};
+  num("#t_medRimb",T.spese,"medRimb");num("#t_medExtra",T.spese,"medExtra");num("#t_istr",T.spese,"istr");num("#t_trasp",T.spese,"trasp");num("#t_sport",T.spese,"sport");
+  $("#t_sportN").onchange=e=>{T.spese.sportN=Math.max(1,parseInt(e.target.value)||1);writeConfig();render()};
+  $("#t_reg").onchange=e=>{T.add.reg=e.target.value;writeConfig();render()};
+  num("#t_regRate",T.add,"regRate");num("#t_comRate",T.add,"comRate");num("#t_comSoglia",T.add,"comSoglia");
+}
+function openEmpEditor(y,e){const T=taxYear(y);const isNew=!e;e=e?JSON.parse(JSON.stringify(e)):{id:uid(),name:"",type:"dipendente",from:1,to:12,extra:[13]};
+  const mOpt=sel=>MESI.map((l,i)=>`<option value="${i+1}" ${i+1===sel?"selected":""}>${l}</option>`).join("");
+  modalShell(isNew?"Nuovo reddito":"Modifica reddito",`
+    <div class="seg" role="group" aria-label="Tipo">${["dipendente","cococo"].map(k=>`<button type="button" data-et="${k}" aria-pressed="${e.type===k}">${TIPI[k]}</button>`).join("")}</div>
+    <p class="faint" id="em_hint" style="margin:0;font-size:12.5px"></p>
+    <label class="field"><span>Nome del datore o committente</span><input id="em_name" type="text" value="${esc(e.name)}" placeholder="Es. CNOS-FAP"></label>
+    <div class="grid2"><label class="field"><span>Da</span><select id="em_from">${mOpt(+e.from||1)}</select></label><label class="field"><span>fino a</span><select id="em_to">${mOpt(+e.to||12)}</select></label></div>
+    <label class="switch" id="em_13w"><span>Tredicesima</span><input type="checkbox" id="em_13" ${(e.extra||[]).includes(13)?"checked":""}></label>
+    <label class="switch" id="em_14w"><span>Quattordicesima</span><input type="checkbox" id="em_14" ${(e.extra||[]).includes(14)?"checked":""}></label>
+    <p id="em_err" class="neg" hidden style="margin:0"></p>
+    <div class="actions"><button class="btn primary" type="submit">Salva</button>${isNew?"":`<button class="btn danger" type="button" id="em_del">Elimina</button>`}</div>`);
+  const hint=()=>{$("#em_hint").textContent=e.type==="cococo"?"Collaborazione coordinata e continuativa: compensi con cedolino mensile, IRPEF trattenuta come per i dipendenti. Non ha il taglio del cuneo fiscale.":"Contratto da dipendente con busta paga.";
+    document.querySelectorAll("[data-et]").forEach(b=>b.setAttribute("aria-pressed",b.dataset.et===e.type));if(isNew&&e.type==="cococo"){$("#em_13").checked=false}};
+  document.querySelectorAll("[data-et]").forEach(b=>b.onclick=()=>{e.type=b.dataset.et;hint()});hint();
+  $("#mf").onsubmit=ev=>{ev.preventDefault();const n=$("#em_name").value.trim();const f=+$("#em_from").value,t=+$("#em_to").value;
+    if(!n||t<f){const er=$("#em_err");er.textContent=!n?"Scrivi il nome.":"Il mese di fine deve venire dopo quello di inizio.";er.hidden=false;return}
+    Object.assign(e,{name:n,from:f,to:t,extra:[$("#em_13").checked?13:0,$("#em_14").checked?14:0].filter(Boolean)});
+    const k=T.employers.findIndex(x=>x.id===e.id);if(k>=0)T.employers[k]=e;else T.employers.push(e);writeConfig();closeModal();render()};
+  if(!isNew)armDelete($("#em_del"),()=>{T.employers=T.employers.filter(x=>x.id!==e.id);T.slips=T.slips.filter(s=>s.emp!==e.id);writeConfig();closeModal();render()})}
+function openSlipEditor(y,empId,m){const T=taxYear(y);const e=T.employers.find(x=>x.id===empId);const s=T.slips.find(x=>x.emp===empId&&x.m===m);const cur=s||{id:uid(),emp:empId,m,imp:"",irpef:"",bonus:""};
+  const coco=e.type==="cococo";
+  modalShell(`${esc(e.name)} · ${m<=12?MESI[m-1]:MESI_730[m]} ${y}`,`
+    <p class="muted" style="margin:0;font-size:14px">Copia i valori dal ${coco?"cedolino":"la busta paga"} di questo mese.</p>
+    <label class="field"><span>Imponibile IRPEF (€)</span><input id="sl_imp" class="amount-in" type="text" inputmode="decimal" value="${numIn(cur.imp)}" placeholder="0,00"></label>
+    <label class="field"><span>IRPEF trattenuta (€)</span><input id="sl_irpef" type="text" inputmode="decimal" value="${numIn(cur.irpef)}" placeholder="0,00"></label>
+    <label class="field"><span>${coco?"Trattamento integrativo in busta (€, facoltativo)":"Bonus in busta (€, facoltativo)"}</span><input id="sl_bonus" type="text" inputmode="decimal" value="${numIn(cur.bonus)}" placeholder="0,00"></label>
+    <p class="faint" style="margin:0;font-size:12.5px">Imponibile IRPEF: il lordo meno i contributi INPS a tuo carico${coco?" (Gestione separata)":""}, spesso indicato come "Imponibile fiscale". IRPEF trattenuta: la ritenuta IRPEF netta del mese.${coco?"":' Bonus: "somma esente cuneo fiscale" e "trattamento integrativo", se presenti.'}</p>
+    <p id="sl_err" class="neg" hidden style="margin:0"></p>
+    <div class="actions"><button class="btn primary" type="submit">Salva</button>${s?`<button class="btn danger" type="button" id="sl_del">Elimina</button>`:""}</div>`);
+  $("#mf").onsubmit=ev=>{ev.preventDefault();const imp=parseAmt($("#sl_imp").value),ir=parseAmt($("#sl_irpef").value||"0"),bo=parseAmt($("#sl_bonus").value||"0");
+    if(!isFinite(imp)||!isFinite(ir)||!isFinite(bo)){const er=$("#sl_err");er.textContent="Controlla gli importi: servono numeri, per esempio 1.497,24.";er.hidden=false;return}
+    Object.assign(cur,{imp:r2(imp),irpef:r2(ir),bonus:r2(bo)});if(!s)T.slips.push(cur);writeConfig();closeModal();render();toast("Salvato")};
+  if(s)armDelete($("#sl_del"),()=>{T.slips=T.slips.filter(x=>x!==s);writeConfig();closeModal();render()});
+  setTimeout(()=>{const f=$("#sl_imp");if(f)f.focus()},50)}
+function openOccEditor(y,o){const T=taxYear(y);const isNew=!o;const cur=o?Object.assign({},o):{id:uid(),who:"",d:(String(y)===todayISO().slice(0,4)?todayISO():y+"-01-01"),lordo:"",rit:"",contr:0};
+  let ritTouched=!isNew;
+  modalShell(isNew?"Nuovo compenso occasionale":"Modifica compenso",`
+    <label class="field"><span>Committente</span><input id="oc_who" type="text" value="${esc(cur.who)}" placeholder="Es. Associazione X"></label>
+    <div class="grid2"><label class="field"><span>Compenso lordo (€)</span><input id="oc_lordo" class="amount-in" type="text" inputmode="decimal" value="${numIn(cur.lordo)}" placeholder="0,00"></label>
+      <label class="field"><span>Data</span><input id="oc_d" type="date" value="${esc(cur.d)}"></label></div>
+    <div class="grid2"><label class="field"><span>Ritenuta d'acconto (€)</span><input id="oc_rit" type="text" inputmode="decimal" value="${numIn(cur.rit)}" placeholder="20% del lordo"></label>
+      <label class="field"><span>Contributi INPS a tuo carico (€)</span><input id="oc_contr" type="text" inputmode="decimal" value="${numIn(cur.contr||0)}"></label></div>
+    <p class="faint" style="margin:0;font-size:12.5px">La ritenuta si calcola da sola al 20% del lordo. I contributi INPS ci sono solo se nell'anno superi 5.000 € di compensi occasionali: li trovi nella ricevuta.</p>
+    <p id="oc_err" class="neg" hidden style="margin:0"></p>
+    <div class="actions"><button class="btn primary" type="submit">Salva</button>${isNew?"":`<button class="btn danger" type="button" id="oc_del">Elimina</button>`}</div>`);
+  $("#oc_rit").addEventListener("input",()=>{ritTouched=true});
+  $("#oc_lordo").addEventListener("input",()=>{if(ritTouched)return;const v=parseAmt($("#oc_lordo").value);$("#oc_rit").value=isFinite(v)?numIn(r2(v*.2)):""});
+  $("#mf").onsubmit=ev=>{ev.preventDefault();const l=parseAmt($("#oc_lordo").value),r=parseAmt($("#oc_rit").value||"0"),co=parseAmt($("#oc_contr").value||"0");
+    if(!isFinite(l)||l<=0||!isFinite(r)||!isFinite(co)){const er=$("#oc_err");er.textContent="Controlla gli importi: il compenso lordo è obbligatorio.";er.hidden=false;return}
+    Object.assign(cur,{who:$("#oc_who").value.trim(),d:$("#oc_d").value,lordo:r2(l),rit:r2(r),contr:r2(co)});
+    const k=T.occ.findIndex(x=>x.id===cur.id);if(k>=0)T.occ[k]=cur;else T.occ.push(cur);writeConfig();closeModal();render();toast("Compenso salvato")};
+  if(!isNew)armDelete($("#oc_del"),()=>{T.occ=T.occ.filter(x=>x.id!==cur.id);writeConfig();closeModal();render()});
+  setTimeout(()=>{const f=$("#oc_lordo");if(f&&isNew)f.focus()},50)}
 
 let rzT;window.addEventListener("resize",()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(S.ui.tab==="grafici")render()},200)});
 boot();
