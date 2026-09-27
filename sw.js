@@ -1,5 +1,5 @@
 /* Conto Chiaro – service worker: l'app funziona anche offline. I dati NON passano di qui: restano nel dispositivo. */
-const VERSION = "cc-v3";
+const VERSION = "cc-v4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL))); });
 self.addEventListener("activate", e => {
